@@ -32,8 +32,12 @@ export function init(context: vscode.ExtensionContext) {
 
   // Create table if it doesn't already exist
   db.run(
-    "CREATE TABLE IF NOT EXISTS Time (id TEXT, project TEXT, start INTEGER, end INTEGER)"
+    "CREATE TABLE IF NOT EXISTS Time (id TEXT, project TEXT, branch TEXT, start INTEGER, end INTEGER)"
   );
+  db.run(`
+    ALTER TABLE Time
+    ADD COLUMN branch TEXT
+  `);
 
   return db;
 }

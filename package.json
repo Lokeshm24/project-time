@@ -67,5 +67,8 @@
     "cuid": "^2.1.8",
     "humanize-duration": "^3.27.3",
     "sqlite3": "^5.1.4"
-  }
+  },
+  "extensionDependencies": [
+    "vscode.git"
+  ]
 }

@@ -4,6 +4,8 @@ import {
   fetchAllRowsBetween,
   prettyTime,
   exportJSONData,
+  getCurrentProject,
+  getCurrentBranch,
 } from "./helpers";
 
 export function exportAllTimes(db: any) {
@@ -13,52 +15,64 @@ export function exportAllTimes(db: any) {
   );
 
   fetchAllRowsAfter(db).then(async (data) => {
-    // create a new object of project names
+    // create a new object of project names with date-wise accumulation
     let projects: any = {};
+
     // loop through the data
     data.forEach((row) => {
-      // if the project name is not in the object
       if (!projects[row.project]) {
-        projects[row.project] = {
-          msDuration: 0,
-        };
+        projects[row.project] = {};
       }
+
+      let date = new Date(row.start).toISOString().split("T")[0]; // get the date part
+
+      if (!projects[row.project][date]) {
+        projects[row.project][date] = {};
+      }
+
+      if (!projects[row.project][date][row.branch]) {
+        projects[row.project][date][row.branch] = 0;
+      }
+
       if (row.end !== null) {
-        projects[row.project].msDuration += row.end - row.start;
+        projects[row.project][date][row.branch] += row.end - row.start;
       }
     });
 
-    // find min date in data
-    let minDate = new Date(
-      Math.min.apply(
-        null,
-        data.map((d) => d.start)
-      )
-    );
+    // create a final export object
+    let exportData: any = {};
 
-    // find max date in data
-    let maxDate = new Date(
-      Math.max.apply(
-        null,
-        data.map((d) => d.end)
-      )
-    );
-
-    // add start and end date to projects object
-    projects.startDate = minDate;
-    projects.endDate = maxDate;
-
-    // add pretty duration to each project
     for (const project in projects) {
-      projects[project].duration = prettyTime(projects[project].msDuration);
+      exportData[project] = {};
+
+      const dates = Object.keys(projects[project]).sort(
+        (a, b) => new Date(b).getTime() - new Date(a).getTime()
+      );
+
+      dates.forEach((date) => {
+        exportData[project][date] = [];
+
+        // Get all branches for this date
+        const branches = Object.keys(projects[project][date]);
+
+        // Sort branches alphabetically
+        branches.sort();
+
+        // Populate exportData using sorted branches
+        branches.forEach((branch) => {
+          exportData[project][date].push({
+            branch: branch,
+            msDuration: projects[project][date][branch],
+            duration: prettyTime(projects[project][date][branch]),
+          });
+        });
+      });
     }
 
     // export the data
-    await exportJSONData(projects);
+    await exportJSONData(exportData);
   });
 }
-
-
 
 export async function exportTimesBetween(db: any) {
   // ask the user for a start and end date
@@ -94,7 +108,6 @@ export async function exportTimesBetween(db: any) {
       throw new Error("Export failed. Start date is after end date.");
     }
 
-    
     // Display a message box to the user
     vscode.window.showInformationMessage(
       "Project Time: Exporting your time data."

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { init } from "./init";
 import {
+  getCurrentBranch,
   getCurrentProject,
   getTodaysTime,
   startTimeTracking,
@@ -20,20 +21,53 @@ export function activate(context: vscode.ExtensionContext) {
   // Get the current project name
   const currentProject = getCurrentProject();
 
+  let currentBranch = getCurrentBranch();
 
   // only track time if in a project folder
-  if (currentProject !== undefined) {
+  if (currentProject !== undefined && currentBranch !== undefined) {
     // Start time tracking
-    startTimeTracking(db, currentProject);
+    startTimeTracking(db, currentProject, currentBranch);
 
     // Check for changes in editor focus
     vscode.window.onDidChangeWindowState((e) => {
       // if within a project folder
       if (e.focused === true) {
-        startTimeTracking(db, currentProject);
+        console.log("started in window change - " + currentBranch);
+        startTimeTracking(db, currentProject, currentBranch);
       } else {
+        console.log("stopped in window change - " + currentBranch);
         stopTimeTracking(db);
       }
+    });
+
+    const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
+    if (!gitExtension) {
+      return;
+    }
+
+    const api = gitExtension.getAPI(1);
+    const handleBranchChange = (repo: any) => {
+      if (repo.state.HEAD?.name !== currentBranch) {
+        currentBranch = repo.state.HEAD?.name;
+        stopTimeTracking(db);
+        startTimeTracking(db, currentProject, currentBranch);
+      }
+    };
+
+    console.log("adding listener - " + currentBranch);
+    api.onDidOpenRepository((repo: any) => {
+      console.log("changed in open repository - " + repo.state.HEAD?.name);
+      handleBranchChange(repo);
+      repo.state.onDidChange(() => handleBranchChange(repo));
+    });
+
+    // Handle already open repositories
+    api.repositories.forEach((repo: any) => {
+      handleBranchChange(repo);
+      console.log(
+        "changed in open repository foreach - " + repo.state.HEAD?.name
+      );
+      repo.state.onDidChange(() => handleBranchChange(repo));
     });
   }
 
@@ -42,9 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
   const myCommandId = "project-time.todays-time";
   context.subscriptions.push(
     vscode.commands.registerCommand(myCommandId, () => {
-      vscode.window.showInformationMessage(
-        `Project Time is active!`
-      );
+      vscode.window.showInformationMessage(`Project Time is active!`);
     })
   );
 

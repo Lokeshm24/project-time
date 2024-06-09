@@ -14,6 +14,22 @@ export function getCurrentProject() {
   return currentProject;
 }
 
+// Get the current branch name
+export function getCurrentBranch() {
+  const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
+  if (!gitExtension) {
+    return undefined;
+  }
+
+  const api = gitExtension.getAPI(1);
+  const repo = api.repositories[0];
+  if (!repo) {
+    return undefined;
+  }
+
+  return repo.state.HEAD?.name;
+}
+
 export function fetchAllRowsAfter(db: any, date?: number) {
   if (date) {
     return new Promise((resolve, reject) => {
@@ -62,7 +78,6 @@ export function fetchAllRowsBetween(db: any, start: Date, end: Date) {
   }) as Promise<Time[]>;
 }
 
-
 export async function getTodaysTime(db: any) {
   //  startOfToday as a number
   const startOfToday = new Date();
@@ -88,7 +103,7 @@ export async function getTodaysTime(db: any) {
 }
 
 export function prettyTime(ms: number) {
-   return shortEnglishHumanizer(ms, {
+  return shortEnglishHumanizer(ms, {
     delimiter: " ",
     spacer: "",
     maxDecimalPoints: 0,
@@ -97,10 +112,15 @@ export function prettyTime(ms: number) {
   });
 }
 
-export function startTimeTracking(db: any, currentProject: string) {
-  db.run("INSERT INTO Time (id, project, start) VALUES (?, ?, ?)", [
+export function startTimeTracking(
+  db: any,
+  currentProject: string,
+  branch: string
+) {
+  db.run("INSERT INTO Time (id, project, branch, start) VALUES (?, ?, ?, ?)", [
     cuid(),
     currentProject,
+    branch,
     Date.now(),
   ]);
 }
